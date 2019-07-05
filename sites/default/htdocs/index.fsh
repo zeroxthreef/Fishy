@@ -9,5 +9,7 @@
 		[@include embedded.html] <!-- note that [[@include "hey.html"] also works (when unescaped) -->
 		<br><br>
 		[[@include nothing.html]. The tag was escaped and now you can see it.
+		<br><br>
+		<a href="place">go to another location</a>
 	</body>
 </html>
