@@ -15,7 +15,10 @@ entire site catchalls are in "default". THis folder is right in the root of page
 	the root of the mapping is laid out like this:
 	scripts -> the global template scripts
 	statuses -> various variables that are useful for retrieving the servers state
-		sent_data
+		// nvm sent_data -> total amount of bytes sent in the servers current uptime
+		current_error -> this returns the http error
+		full_fault -> indicates that template execution should immediately stop and show the error
+				template instead.
 	sites -> all sites
 		example_site
 			scripts -> the template scripts local to only this site
@@ -68,10 +71,11 @@ int init()
 		conf->headers += (["accept-ranges" : "none"]);
 
 	//setup the global mapping
-	globals += (["scripts":([]), "statuses":([]) ]);
+	globals += (["scripts":([]), "statuses":(["current_error" : 200, "full_fault" : false]) ]);
 
 	//setup the statuses
 	globals->statuses += (["sent_data":0]);
+	
 
 	//init all site scripts, template scripts, and global template scripts
 	array(string) scriptNames = get_dir(conf->global->scripts);
@@ -109,6 +113,11 @@ int init()
 
 void route(Request req)
 {
+	//re-init everything
+	globals->statuses->current_error = 200;
+	globals->statuses->full_fault = false;
+
+
 	write("%s:%s\n", req->request_type, ParsePath(Protocols.HTTP.uri_decode(req->not_query)));
 	mapping res = ([]); //data, file, error, length, modified, type, extra_heads, server
 	//route to index.ext or directory OR index.ext
@@ -143,57 +152,26 @@ void route(Request req)
 	// _only_ respond with a string buffer if it is an fsh file. Use mmap'ed files for everything else
 	if(DetermineExtension(filePath) == "fsh") //respond with the fsh file
 	{
-		res->data = TemplateParse(globals, conf, globals->sites->default, Stdio.read_file(filePath), filePath, req);
+		if((res->data = TemplateParse(globals, conf, globals->sites->default, Stdio.read_file(filePath), filePath, req)) == UNDEFINED)
+		{
+			//also set the status code
+			filePath = conf->global->error_templates + "/" + conf->global->catchall_error;
+
+			//re-init everything
+			globals->statuses->current_error = 500;
+			globals->statuses->full_fault = false;
+
+			if((res->data = TemplateParse(globals, conf, globals->sites->default, Stdio.read_file(filePath), filePath, req)) == UNDEFINED)
+			{
+				write("critical error. Unable to parse the prior tag and also the default error page\n");
+				res->data = "worst case server error encountered";
+			}
+		}
 	}
 	else
 	{
 		res->file = Stdio.File(filePath);
 	}
-	/*else if(!req->request_headers->range) //respond with the plain file, cached or uncached
-	{
-		//test if the file is to large to be sent in ram from the cache
-
-		//TODO override this when ranges asked for
-		if(Stdio.file_size(filePath) > (int)conf->cache->max_individual)
-			res->file = Stdio.File(filePath);
-		else
-			res->data = Stdio.read_file(filePath);
-	}
-
-	//this is the final check. Placed in its own statement just in case if the client asks for
-	//the range in a fsh file
-
-	if(req->request_headers->range)
-	{
-		int fileSize = DetermineExtension(filePath) == "fsh" ? strlen(res->data) : Stdio.file_size(filePath);
-		array(array) ranges = PaseRanges(req->request_headers->range, fileSize);
-
-		//test if it should do content range or multipart/byteranges
-		if(ranges == UNDEFINED)
-		{
-			res->data = UNDEFINED;
-			res->error = 416;
-		}
-		else if(sizeof(ranges) == 1) //content range
-		{
-			res->error = 206;
-			res->extra_heads = (["content-range" : "bytes " + ranges[0][0] + "-" + (ranges[0][0] + ranges[0][1]) + "/" + fileSize]);
-			//super hacky, but I have to get the internal ranges to stop overwriting this because its broken
-			res->start = 1;
-
-			if(DetermineExtension(filePath) != "fsh")
-				res->data = Stdio.read_bytes(filePath, ranges[0][0], ranges[0][1]);
-			else
-				res->data = res->data[ranges[0][0]..ranges[0][0] + ranges[0][1]];
-			
-		}
-		else //multipart
-		{
-
-		}
-	}
-		
-	*/
 
 	//manage response headers
 	if(conf->headers->server)
@@ -209,8 +187,8 @@ void route(Request req)
 
 
 
-	if(!res->error)
-		res->error = 200;
+	if(globals->statuses->current_error != 200)
+		res->error = globals->statuses->current_error;
 
 	req->response_and_finish(res);
 
@@ -345,64 +323,4 @@ int InitSites(string path, string aboveDir)
 		}
 	}
 	return 0;
-}
-
-array(array) PaseRanges(string rangeData, int fileSize)
-{
-	array parts = rangeData / "=";
-	array(array) ret = ({});
-
-	if(sizeof(parts) != 2)
-		return UNDEFINED;
-	
-	
-	if(parts[0] != "bytes")
-		return UNDEFINED;
-
-	parts = parts[1] / ", ";
-
-	//work through all of the ranges
-
-	foreach(parts, string range)
-	{
-		int begin, length;
-
-		if(range[0..0] == "-" || range[strlen(range) - 1..] == "-") //wants range from/till
-		{
-			if(range[0..0] == "-") //wants end bytes
-			{
-				begin = fileSize - (int)range[1..];
-				length = fileSize - begin;
-			}
-			else //wants bytes from a certain point to end
-			{
-				begin = (int)range;
-				length = fileSize - begin;
-			}
-		}
-		else if(sizeof((range / "-")) == 2) //wants range between
-		{
-			array bounds = range / "-";
-
-			//make sure the bounds arent outside the files actual size
-
-			begin = (int)bounds[0];
-			length = (int)bounds[1];
-
-			if(begin > length)
-				continue;
-			
-			length = length - begin;
-
-			if(begin > fileSize)
-				continue;
-
-		}
-		else //invalid range format
-			return UNDEFINED;
-
-		ret += ({({begin, length})});
-	}
-
-	return ret;
 }

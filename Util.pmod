@@ -87,6 +87,7 @@ string DetermineFile(string path)
 class FishyTagData
 {
 	public mapping globals;
+	public mapping status;
 	public mapping locals;
 	public mapping config;
 	public array arguments;
@@ -94,15 +95,26 @@ class FishyTagData
 	public string callerFile;
 	public string callerFileParent;
 
-	void create(mapping globals, mapping locals, mapping config, array arguments, Protocols.HTTP.Server.Request request, string callerFile)
+	void create(mapping globals, mapping status, mapping locals, mapping config, array arguments, Protocols.HTTP.Server.Request request, string callerFile)
 	{
 		this->globals = globals;
+		this->status = status;
 		this->locals = locals;
 		this->config = config;
 		this->arguments = arguments;
 		this->request = request;
 		this->callerFile = callerFile;
 		this->callerFileParent = replace(callerFile, "/" + DetermineFile(callerFile), "");
+	}
+
+	void SetError(int value)
+	{
+		status->current_error = value;
+	}
+
+	void SetFault()
+	{
+		status->full_fault = true;
 	}
 
 };

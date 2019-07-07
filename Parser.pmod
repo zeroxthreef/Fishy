@@ -17,7 +17,7 @@ string TemplateParse(mapping globals, mapping config, mapping locals, string inp
 
 	while((pos = search(finalString, "[@")) != -1)
 	{
-
+write("status: %s\n", finalString);
 		//test if the tag has not been escaped
 		if(finalString[pos - 1..pos] != "[[")
 		{
@@ -45,6 +45,12 @@ string TemplateParse(mapping globals, mapping config, mapping locals, string inp
 			mapping replacement = TemplateCommandParse(tag);
 
 			finalString = replace(finalString, tag, TemplateExecute(file, replacement, globals, locals, config, request));
+
+			if(globals->statuses->full_fault)
+			{
+				write("template encountered irrecoverable fault\n");
+				return UNDEFINED;
+			}
 		}
 		else //turn the tag left side into an html escape
 		{
@@ -102,7 +108,7 @@ string TemplateExecute(string file, mapping tag, mapping globals, mapping locals
 		mixed err = catch
 		{
 			//dont pass the globals to the site specific functions just in case
-			return script.respond(FishyTagData(UNDEFINED, locals, config, tag->arguments, request, file));
+			return script.respond(FishyTagData(UNDEFINED, globals->statuses, locals, config, tag->arguments, request, file));
 		};
 		if(err)
 		{
@@ -120,7 +126,7 @@ string TemplateExecute(string file, mapping tag, mapping globals, mapping locals
 	{
 		mixed err = catch
 		{
-			return script.respond(FishyTagData(globals, locals, config, tag->arguments, request, file));
+			return script.respond(FishyTagData(globals, globals->statuses, locals, config, tag->arguments, request, file));
 		};
 		if(err)
 		{
