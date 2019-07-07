@@ -111,7 +111,6 @@ void route(Request req)
 {
 	write("%s:%s\n", req->request_type, ParsePath(Protocols.HTTP.uri_decode(req->not_query)));
 	mapping res = ([]); //data, file, error, length, modified, type, extra_heads, server
-	write("mhm %O\n", req->request_headers);
 	//route to index.ext or directory OR index.ext
 	//TODO make an in-memory representation of files that already exist. Also make a separate one for the actual file caches
 
@@ -144,7 +143,7 @@ void route(Request req)
 	// _only_ respond with a string buffer if it is an fsh file. Use mmap'ed files for everything else
 	if(DetermineExtension(filePath) == "fsh") //respond with the fsh file
 	{
-		res->data = TemplateParse(globals, conf, globals->sites->default, Stdio.read_file(filePath), req);
+		res->data = TemplateParse(globals, conf, globals->sites->default, Stdio.read_file(filePath), filePath, req);
 	}
 	else
 	{
@@ -208,15 +207,14 @@ void route(Request req)
 	
 	res->type = DetermineMime(filePath);
 
-	write("aaa %s\n", DetermineMime(filePath));
+
 
 	if(!res->error)
 		res->error = 200;
 
 	req->response_and_finish(res);
 
-	globals->statuses->sent_data = req->sent_data();
-	write("woo %O %O\n", globals->statuses->sent_data, req->get_ip());
+	//globals->statuses->sent_data = req->sent_data();
 }
 
 string ParsePath(string uri)
@@ -268,29 +266,6 @@ string FinalizePath(string site, string path, mapping config)
 	}
 	else
 		return root + path;
-}
-
-string DetermineExtension(string path)
-{
-	array parts = path / ".";
-
-	if(sizeof(parts) == 1)
-		return UNDEFINED;
-	
-	if(parts[sizeof(parts) - 1] == "")
-		return UNDEFINED;
-	else
-		return parts[sizeof(parts) - 1];
-}
-
-string DetermineFile(string path)
-{
-	array parts = path / "/";
-
-	if(sizeof(parts) == 1)
-		return UNDEFINED;
-
-	return parts[sizeof(parts) - 1];
 }
 
 string DetermineMime(string path)

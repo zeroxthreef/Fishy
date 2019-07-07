@@ -59,3 +59,50 @@ string DetermineSiteRoute(string siteName, mapping globals, mapping conf)
 	else
 		return siteName;
 }
+
+string DetermineExtension(string path)
+{
+	array parts = path / ".";
+
+	if(sizeof(parts) == 1)
+		return UNDEFINED;
+	
+	if(parts[sizeof(parts) - 1] == "")
+		return UNDEFINED;
+	else
+		return parts[sizeof(parts) - 1];
+}
+
+string DetermineFile(string path)
+{
+	array parts = path / "/";
+
+	if(sizeof(parts) == 1)
+		return UNDEFINED;
+
+	return parts[sizeof(parts) - 1];
+}
+
+// set the globals to UNDEFINED if its a local tag
+class FishyTagData
+{
+	public mapping globals;
+	public mapping locals;
+	public mapping config;
+	public array arguments;
+	public Protocols.HTTP.Server.Request request;
+	public string callerFile;
+	public string callerFileParent;
+
+	void create(mapping globals, mapping locals, mapping config, array arguments, Protocols.HTTP.Server.Request request, string callerFile)
+	{
+		this->globals = globals;
+		this->locals = locals;
+		this->config = config;
+		this->arguments = arguments;
+		this->request = request;
+		this->callerFile = callerFile;
+		this->callerFileParent = replace(callerFile, "/" + DetermineFile(callerFile), "");
+	}
+
+};

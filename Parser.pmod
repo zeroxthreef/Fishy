@@ -5,7 +5,7 @@ import .Util;
 //template format is [@operation (optional)argument ...]
 //can be unparsed if prefixed with another [ like: [[@operation (optional)argument ...]
 //if the tag is, for example, [@include thingo.md], it will include a file into the current place
-string TemplateParse(mapping globals, mapping config, mapping locals, string input, Protocols.HTTP.Server.Request request)
+string TemplateParse(mapping globals, mapping config, mapping locals, string input, string file, Protocols.HTTP.Server.Request request)
 {
 	int pos = 0, instring = 0;
 	string finalString = input, temp, temp_before, tag = UNDEFINED;
@@ -44,7 +44,7 @@ string TemplateParse(mapping globals, mapping config, mapping locals, string inp
 
 			mapping replacement = TemplateCommandParse(tag);
 
-			finalString = replace(finalString, tag, TemplateExecute(replacement, globals, locals, config, request));
+			finalString = replace(finalString, tag, TemplateExecute(file, replacement, globals, locals, config, request));
 		}
 		else //turn the tag left side into an html escape
 		{
@@ -82,7 +82,8 @@ mapping TemplateCommandParse(string tag)
 	return ret;
 }
 
-string TemplateExecute(mapping tag, mapping globals, mapping locals, mapping config, Protocols.HTTP.Server.Request request)
+//TODO pass the scripts current parent folder and call script
+string TemplateExecute(string file, mapping tag, mapping globals, mapping locals, mapping config, Protocols.HTTP.Server.Request request)
 {
 	object script;
 	mapping site;
@@ -100,7 +101,8 @@ string TemplateExecute(mapping tag, mapping globals, mapping locals, mapping con
 	{
 		mixed err = catch
 		{
-			return script.respond(config, locals, tag->arguments, request);
+			//dont pass the globals to the site specific functions just in case
+			return script.respond(FishyTagData(UNDEFINED, locals, config, tag->arguments, request, file));
 		};
 		if(err)
 		{
@@ -118,7 +120,7 @@ string TemplateExecute(mapping tag, mapping globals, mapping locals, mapping con
 	{
 		mixed err = catch
 		{
-			return script.respond(globals, config, tag->arguments, request);
+			return script.respond(FishyTagData(globals, locals, config, tag->arguments, request, file));
 		};
 		if(err)
 		{

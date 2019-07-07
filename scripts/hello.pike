@@ -1,6 +1,7 @@
+#include "../Util.pmod"
 //hello world template
 
-string respond(mapping globals, mapping config, array arguments, Protocols.HTTP.Server.Request request)
+string respond(FishyTagData tagData)
 {
 	return "hello";
 }

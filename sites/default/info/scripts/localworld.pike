@@ -1,5 +1,7 @@
+#include "../../../../Util.pmod"
 
-string respond(mapping config, mapping locals, array arguments, Protocols.HTTP.Server.Request request)
+
+string respond(FishyTagData tagData)
 {
-	return locals->locals->message;
+	return tagData.locals->locals->message;
 }
